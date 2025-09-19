@@ -1,0 +1,138 @@
+# Beyond the basics: Advanced GIL mitigation patterns
+
+This repository contains the code for the presentation "Beyond the basics: Advanced GIL mitigation patterns," delivered by Rohan Giriraj at PyCon India 2025. It provides a hands-on demonstration of the Python Global Interpreter Lock (GIL), its impact on concurrent programming, and advanced techniques to mitigate its effects using Cython.
+
+The core of this repository is a case study on high-performance image processing, where a color image is converted to grayscale. This task is implemented in both pure Python and with Cython to showcase the dramatic performance improvements that can be achieved by sidestepping the GIL.
+
+## Key Concepts Demonstrated
+
+*   **Global Interpreter Lock (GIL):** The code provides a real-world example of the GIL's impact on multi-threaded, CPU-bound operations.
+*   **Cython:** It utilizes Cython to compile Python-like code into optimized C code.
+*   **`nogil`:** The Cython implementation makes use of the `with nogil:` directive to release the GIL, allowing for true parallelism.
+*   **OpenMP:** The code leverages OpenMP's multi-threading capabilities through Cython's `prange` to parallelize loops for maximum performance.
+
+## How it Works
+
+The pure Python implementation demonstrates the performance bottleneck of a nested loop for pixel manipulation in a CPU-bound task. The Cython version, on the other hand, moves this same logic into a `.pyx` file and utilizes typed memoryviews for direct C-level access to the image data, along with the `nogil` and `prange` directives to enable parallel execution.
+
+The demos are divided into three parts:
+1.  **The GIL in Action**: A simple script to visualize how the GIL prevents true parallelism for CPU-bound tasks using standard Python threads.
+2.  **Cython for Performance**: A basic example of compiling Python code with Cython to achieve a significant speedup.
+3.  **Image Processing Benchmark**: A real-world comparison of three approaches to a CPU-intensive image processing task:
+    *   Pure, single-threaded Python.
+    *   Multi-threaded Python (demonstrating the GIL's limitations).
+    *   Cython with OpenMP (releasing the GIL for true parallelism).
+
+## Prerequisites
+
+Before running the demos, you need to have Python, a C compiler, and a few Python packages installed.
+
+1.  **Install a C compiler:**
+    *   On Linux (Debian/Ubuntu): `sudo apt-get install build-essential`
+    *   On macOS: Install Xcode Command Line Tools with `xcode-select --install`
+    *   On Windows: Install Microsoft C++ Build Tools from the Visual Studio Installer.
+
+2.  **Install required Python packages:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Demo 1: The GIL in Action (`gil_demo.py`)
+
+This demo illustrates that for CPU-bound operations, using multiple threads in Python does not lead to a performance gain due to the GIL. The GIL is a mutex that ensures only one thread executes Python bytecode at a time within a single process.
+
+### Instructions
+
+Run the script directly from your terminal:
+```bash
+python gil_demo.py
+```
+
+### Expected Outcome
+
+You will see output similar to this:
+```
+Sequential execution took: 4.5123 seconds
+Threaded execution took:   4.5345 seconds
+```
+Notice that the threaded execution time is not shorter than the sequential time. This is because the countdown function is purely computational (CPU-bound). The GIL prevents the two threads from running on separate CPU cores simultaneously. The slight overhead comes from the cost of managing the threads.
+
+---
+
+## Demo 2: Basic Cython Speedup (`cython_demo.pyx`)
+
+Cython is a superset of Python that allows you to write C-level code. It translates this code into optimized C/C++ which is then compiled. This demo shows how a simple function can be sped up significantly just by compiling it with Cython.
+
+### Instructions
+
+1.  **Compile the Cython code:**
+    The `setup_demo.py` script tells Python how to build the `.pyx` file into a native shared library (`.so` on Linux/macOS, `.pyd` on Windows).
+    ```bash
+    python setup_demo.py build_ext --inplace
+    ```
+    This command creates `cython_demo.cpython-*.so`.
+
+2.  **Run the demo:**
+    ```bash
+    python -c "import cython_demo; import time; n = 200000; start=time.time(); cython_demo.sum_of_squares(n); print(f'Cython took: {time.time()-start:.4f}s')"
+    python -c "import time; n = 200000; start=time.time(); sum(i*i for i in range(1, n + 1)); print(f'Python took: {time.time()-start:.4f}s')"
+    ```
+
+### Expected Outcome
+You will see that the Cython version runs much faster than the pure Python equivalent for this CPU-bound calculation.
+
+---
+
+## Demo 3: Image Processing Benchmark (`run_benchmark.py`)
+
+This is the core demo. It compares three methods for converting a large image to grayscale—a classic CPU-bound task. (The code was mostly written by me, with the tqdm dependency for progress bar and the coloured output being generated by AI.)
+
+*   **Pure Python**: Iterates through each pixel using Python loops.
+*   **Threaded Python**: Splits the image processing work across multiple threads. As we saw in Demo 1, we don't expect a significant speedup.
+*   **Cython with GIL Release**: The image processing logic is moved to Cython. Crucially, we use a `with nogil:` block and OpenMP (`prange`) to release the Global Interpreter Lock and execute the code across multiple CPU cores in parallel.
+
+### Instructions
+
+1.  **Compile the Cython image processing module:**
+    This step requires `numpy` and uses OpenMP for parallelization.
+    ```bash
+    python setup_image.py build_ext --inplace
+    ```
+    This creates `image_cython.cpython-*.so`.
+
+2.  **Run the main benchmark script:**
+    ```bash
+    python run_benchmark.py
+    ```
+
+### Expected Outcome
+
+The script will process an image using all three methods and print the timings. The generated images will be saved within the same directory as the code. The terminal output will look something like this:
+
+```
+--- Image Processing Benchmark ---
+
+[1] Processing 'Curiosity_Self-Portrait_at_'Big_Sky'_Drilling_Site.jpg' with pure Python...
+    Python version took: 118.8970 seconds.
+
+[2] Processing 'Curiosity_Self-Portrait_at_'Big_Sky'_Drilling_Site.jpg' with threaded Python (4 threads)...
+    Threaded Python version took: 149.5329 seconds.
+
+[3] Processing 'Curiosity_Self-Portrait_at_'Big_Sky'_Drilling_Site.jpg' with Cython + OpenMP...
+    Cython version took: 0.1567 seconds.
+
+[4] Performance Comparison:
+    Pure Python:     118.8970 seconds
+    Threaded Python: 149.5329 seconds
+    Cython:          0.0254 seconds
+
+    Speedup vs Pure Python:
+    - Threaded Python: 0.80x
+    - Cython:          4674.37x
+    Cython vs Threaded: 4674.37x faster
+```
+
+### Analysis
+
+*   The **Threaded Python** version shows no improvement (and may be slightly slower) than pure Python, confirming the GIL's impact on CPU-bound threaded code.
+*   The **Cython** version is dramatically faster. By releasing the GIL (`nogil`) and using OpenMP to parallelize the C-level loops, we unlock the full power of the multi-core processor, achieving true parallelism and a massive performance boost. This is the key takeaway for high-performance computing in Python.
