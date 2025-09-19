@@ -136,3 +136,8 @@ The script will process an image using all three methods and print the timings. 
 
 *   The **Threaded Python** version shows no improvement (and may be slightly slower) than pure Python, confirming the GIL's impact on CPU-bound threaded code.
 *   The **Cython** version is dramatically faster. By releasing the GIL (`nogil`) and using OpenMP to parallelize the C-level loops, we unlock the full power of the multi-core processor, achieving true parallelism and a massive performance boost. This is the key takeaway for high-performance computing in Python.
+
+### Next Steps
+*   Check if CUDA integration works and see the speed up CUDA can give as opposed to the Cython + OpenMP approach.
+*   An in-depth comparsion between SIMD workloads and Cython based workloads. Will be writing a custom demo example for the same.
+*   Add unit tests. Will probably clean up the existing code as well.

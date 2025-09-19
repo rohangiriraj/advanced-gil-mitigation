@@ -6,7 +6,7 @@ from tqdm import tqdm
 from image_python import python_grayscale, gil_grayscale
 from image_cython import grayscale_cython
 
-# Simple color constants to avoid large color blocks
+# ANSI color codes for beautified output
 class Colors:
     HEADER = '\033[95m'
     BLUE = '\033[94m'
